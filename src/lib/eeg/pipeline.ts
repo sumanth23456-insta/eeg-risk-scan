@@ -63,7 +63,7 @@ export interface PreprocessResult {
 
 /** Never mutates the input array. */
 export function preprocess(raw: Float64Array, fs: number, o: PreprocessOptions): PreprocessResult {
-  let x = Float64Array.from(raw);
+  let x: Float64Array = Float64Array.from(raw) as Float64Array;
   const steps: PreprocessResult["steps"] = [];
   let invalidCount = 0;
 
