@@ -163,7 +163,7 @@ export function parseEdf(buffer: ArrayBuffer, fileName: string, fileSize: number
   const view = new DataView(buffer);
   const keep = labels
     .map((l, i) => ({ l, i }))
-    .filter(({ l }) => !/EDF Annotations/i.test(l) && samplesPerRecord[l ? i : i] > 0);
+    .filter(({ l, i }) => !/EDF Annotations/i.test(l) && samplesPerRecord[i] > 0);
 
   const data: Float64Array[] = keep.map(({ i }) => new Float64Array(samplesPerRecord[i] * numRecords));
   const writeIdx = keep.map(() => 0);
