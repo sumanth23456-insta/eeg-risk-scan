@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AnalysisRouteImport } from './routes/analysis'
 import { Route as HistoryRouteImport } from './routes/history'
+import { Route as MethodologyRouteImport } from './routes/methodology'
 import { Route as TrainingRouteImport } from './routes/training'
 import { Route as UploadRouteImport } from './routes/upload'
 
@@ -30,6 +31,11 @@ const HistoryRoute = HistoryRouteImport.update({
   path: '/history',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MethodologyRoute = MethodologyRouteImport.update({
+  id: '/methodology',
+  path: '/methodology',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TrainingRoute = TrainingRouteImport.update({
   id: '/training',
   path: '/training',
@@ -45,6 +51,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/analysis': typeof AnalysisRoute
   '/history': typeof HistoryRoute
+  '/methodology': typeof MethodologyRoute
   '/training': typeof TrainingRoute
   '/upload': typeof UploadRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/analysis': typeof AnalysisRoute
   '/history': typeof HistoryRoute
+  '/methodology': typeof MethodologyRoute
   '/training': typeof TrainingRoute
   '/upload': typeof UploadRoute
 }
@@ -60,21 +68,31 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/analysis': typeof AnalysisRoute
   '/history': typeof HistoryRoute
+  '/methodology': typeof MethodologyRoute
   '/training': typeof TrainingRoute
   '/upload': typeof UploadRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/analysis' | '/history' | '/training' | '/upload'
+  fullPaths:
+    '/' | '/analysis' | '/history' | '/methodology' | '/training' | '/upload'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/analysis' | '/history' | '/training' | '/upload'
-  id: '__root__' | '/' | '/analysis' | '/history' | '/training' | '/upload'
+  to: '/' | '/analysis' | '/history' | '/methodology' | '/training' | '/upload'
+  id:
+    | '__root__'
+    | '/'
+    | '/analysis'
+    | '/history'
+    | '/methodology'
+    | '/training'
+    | '/upload'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AnalysisRoute: typeof AnalysisRoute
   HistoryRoute: typeof HistoryRoute
+  MethodologyRoute: typeof MethodologyRoute
   TrainingRoute: typeof TrainingRoute
   UploadRoute: typeof UploadRoute
 }
@@ -102,6 +120,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/methodology': {
+      id: '/methodology'
+      path: '/methodology'
+      fullPath: '/methodology'
+      preLoaderRoute: typeof MethodologyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/training': {
       id: '/training'
       path: '/training'
@@ -123,6 +148,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AnalysisRoute: AnalysisRoute,
   HistoryRoute: HistoryRoute,
+  MethodologyRoute: MethodologyRoute,
   TrainingRoute: TrainingRoute,
   UploadRoute: UploadRoute,
 }
