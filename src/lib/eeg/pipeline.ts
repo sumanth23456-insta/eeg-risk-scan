@@ -252,9 +252,16 @@ export function sliceWindow(rec: EegRecording, ch: number, start: number, end: n
 export function runAnalysis(args: RunAnalysisArgs): AnalysisResult {
   const { recording, channelIndex, windowStart, windowEnd, options, model, table } = args;
   const fs = recording.samplingRate;
+  const fsCheck = validateSamplingRate(fs);
+  if (!fsCheck.valid) throw new Error(fsCheck.errors.join(" "));
   const raw = sliceWindow(recording, channelIndex, windowStart, windowEnd);
+  if (raw.length < Math.max(64, fs)) {
+    throw new Error("Insufficient EEG data for reliable feature extraction (at least 1 s is required).");
+  }
   const pre = preprocess(raw, fs, options);
-  const { features, spectrum, bandPowers } = extractFeatures(pre.signal, fs);
+  const range = analyzedRange(fs, options);
+  const { features, spectrum, bandPowers } = extractFeatures(pre.signal, fs, range.high);
+
 
   const qualityPenalty = Math.min(1, pre.artifactRatio * 3 + (pre.clipped ? 0.2 : 0));
   const risk = assessRisk({
