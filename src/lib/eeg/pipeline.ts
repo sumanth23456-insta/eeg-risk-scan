@@ -12,13 +12,22 @@ import {
   bandpass,
   cleanInvalid,
   detectArtifacts,
+  median,
   normalize,
   notch,
   spectrogram,
   type SpectrogramData,
 } from "./dsp";
 import { extractFeatures, type FeatureVector } from "./features";
+import {
+  analyzedRange,
+  bandCoverage,
+  validateSamplingRate,
+  type AnalyzedRange,
+  type BandStatus,
+} from "./validation";
 import type { EegRecording } from "./parse";
+
 import {
   assessRisk,
   compareToReference,
