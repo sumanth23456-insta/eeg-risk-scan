@@ -100,15 +100,23 @@ function safeRatio(a: number, b: number) {
   return b > 1e-12 ? a / b : 0;
 }
 
-export function extractFeatures(x: Float64Array, fs: number): ExtractionResult {
+/**
+ * @param fMaxHz optional analysed-frequency ceiling (after sampling-rate and
+ * preprocessing limits). Band powers above this ceiling are reported as 0 so no
+ * feature claims content that was never available.
+ */
+export function extractFeatures(x: Float64Array, fs: number, fMaxHz?: number): ExtractionResult {
   const sp = welchPsd(x, fs, Math.min(1024, Math.max(64, 2 ** Math.round(Math.log2(fs * 2)))));
   const nyq = fs / 2;
-  const gammaHi = Math.min(100, nyq);
+  const ceiling = Math.min(100, nyq, fMaxHz ?? Infinity);
+  const gammaHi = ceiling;
   const abs: Record<string, number> = {};
   for (const [name, [lo, hi]] of Object.entries(BANDS)) {
-    abs[name] = hi <= nyq ? bandPower(sp, lo, Math.min(hi, nyq)) : lo < nyq ? bandPower(sp, lo, nyq) : 0;
+    const hiEff = Math.min(hi, ceiling);
+    abs[name] = hiEff > lo ? bandPower(sp, lo, hiEff) : 0;
   }
   const total = bandPower(sp, 0.5, gammaHi) || 1e-12;
+
   const h = hjorth(x);
   const wav = waveletFeatures(x, 5);
   const sf = spikeFeatures(x, fs);
