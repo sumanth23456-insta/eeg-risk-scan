@@ -46,7 +46,7 @@ export const DEFAULT_PREPROCESS: PreprocessOptions = {
   baseline: true,
   bandpass: true,
   bandLow: 0.5,
-  bandHigh: 45,
+  bandHigh: 100,
   notch: true,
   notchFreq: 50,
   normalize: false,
@@ -59,13 +59,25 @@ export interface PreprocessResult {
   artifactRatio: number;
   artifactSegments: number;
   clipped: boolean;
+  /** effective band actually analysed after Nyquist / sampling-rate limits */
+  effectiveLow: number;
+  effectiveHigh: number;
+  outlierCount: number;
+  excludedRatio: number;
+  warnings: string[];
 }
 
 /** Never mutates the input array. */
 export function preprocess(raw: Float64Array, fs: number, o: PreprocessOptions): PreprocessResult {
   let x: Float64Array = Float64Array.from(raw) as Float64Array;
   const steps: PreprocessResult["steps"] = [];
+  const warnings: string[] = [];
   let invalidCount = 0;
+  let outlierCount = 0;
+
+  const fsCheck = validateSamplingRate(fs);
+  warnings.push(...fsCheck.errors, ...fsCheck.warnings);
+  const range = analyzedRange(fs, o);
 
   if (o.removeInvalid) {
     const r = cleanInvalid(x);
@@ -76,20 +88,43 @@ export function preprocess(raw: Float64Array, fs: number, o: PreprocessOptions):
       detail: `${r.invalidCount} non-finite samples interpolated from neighbours.`,
       applied: true,
     });
+    if (r.invalidCount > 0) {
+      warnings.push("Invalid EEG values detected. Please check the uploaded file.");
+    }
   }
   if (o.baseline) {
     x = baselineCorrect(x);
     steps.push({ name: "Baseline correction", detail: "DC offset (segment mean) removed.", applied: true });
   }
-  if (o.bandpass) {
-    x = bandpass(x, fs, o.bandLow, o.bandHigh);
+
+  // Extreme amplitude outliers are limited so single artifacts cannot dominate
+  // the extracted features (no ICA — see methodology, future enhancement).
+  {
+    const r = limitExtremeOutliers(x, 8);
+    x = r.out;
+    outlierCount = r.count;
     steps.push({
-      name: "Band-pass filter",
-      detail: `FIR windowed-sinc (Blackman, 101 taps), ${o.bandLow}–${o.bandHigh} Hz.`,
+      name: "Extreme amplitude outlier handling",
+      detail: `${r.count} sample(s) beyond 8×MAD limited to the robust amplitude envelope.`,
       applied: true,
     });
   }
-  if (o.notch) {
+
+  if (o.bandpass) {
+    const hi = range.high;
+    x = bandpass(x, fs, o.bandLow, hi);
+    steps.push({
+      name: "Band-pass filter",
+      detail: `FIR windowed-sinc (Blackman, 101 taps), ${o.bandLow}–${hi.toFixed(hi % 1 ? 1 : 0)} Hz.`,
+      applied: true,
+    });
+    if (hi < o.bandHigh) {
+      warnings.push(
+        `Requested upper cut-off ${o.bandHigh} Hz exceeds what ${fs} Hz sampling supports; analysis limited to ${hi.toFixed(1)} Hz (Nyquist ${(fs / 2).toFixed(1)} Hz).`,
+      );
+    }
+  }
+  if (o.notch && o.notchFreq < fs / 2) {
     x = notch(x, fs, o.notchFreq);
     steps.push({
       name: "Notch filter",
@@ -103,6 +138,9 @@ export function preprocess(raw: Float64Array, fs: number, o: PreprocessOptions):
     detail: `${(art.ratio * 100).toFixed(2)}% of samples exceed 6×MAD across ${art.segments} segment(s)${art.clipped ? "; possible clipping detected" : ""}.`,
     applied: true,
   });
+  if (art.ratio > 0.2 || art.clipped) {
+    warnings.push("Some EEG segments contain excessive artifacts and were excluded or down-weighted.");
+  }
   if (o.normalize) {
     x = normalize(x);
     steps.push({ name: "Normalisation", detail: "Z-score normalisation (mean 0, SD 1).", applied: true });
@@ -114,8 +152,33 @@ export function preprocess(raw: Float64Array, fs: number, o: PreprocessOptions):
     artifactRatio: art.ratio,
     artifactSegments: art.segments,
     clipped: art.clipped,
+    effectiveLow: range.low,
+    effectiveHigh: range.high,
+    outlierCount,
+    excludedRatio: art.ratio,
+    warnings,
   };
 }
+
+/** Robust limiter: clamps samples beyond k×MAD instead of deleting them. */
+function limitExtremeOutliers(x: Float64Array, k: number): { out: Float64Array; count: number } {
+  const vals = Array.from(x);
+  const med = median(vals);
+  const mad = median(vals.map((v) => Math.abs(v - med))) * 1.4826;
+  if (!Number.isFinite(mad) || mad <= 1e-12) return { out: x, count: 0 };
+  const lim = k * mad;
+  const out = Float64Array.from(x);
+  let count = 0;
+  for (let i = 0; i < out.length; i++) {
+    const d = out[i] - med;
+    if (Math.abs(d) > lim) {
+      out[i] = med + Math.sign(d) * lim;
+      count++;
+    }
+  }
+  return { out, count };
+}
+
 
 export interface RiskTimelinePoint {
   start: number;
