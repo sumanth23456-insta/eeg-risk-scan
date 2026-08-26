@@ -224,7 +224,11 @@ export interface AnalysisResult {
   modelDatasetOrigin: "synthetic" | "uploaded";
   featureCount: number;
   qualityStatus: string;
+  analyzedRange: AnalyzedRange;
+  bandCoverage: BandStatus[];
+  preprocessWarnings: string[];
   recordingId_: string;
+
 }
 
 export interface RunAnalysisArgs {
