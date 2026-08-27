@@ -331,5 +331,8 @@ export function runAnalysis(args: RunAnalysisArgs): AnalysisResult {
     modelDatasetOrigin: model.datasetOrigin,
     featureCount: model.featureKeys.length,
     qualityStatus: recording.quality.status,
+    analyzedRange: range,
+    bandCoverage: bandCoverage(range),
+    preprocessWarnings: pre.warnings,
   };
 }
