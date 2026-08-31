@@ -86,6 +86,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             ))}
           </nav>
+          <GateControl />
         </div>
         <div className="flex items-center justify-center gap-2 border-t border-border bg-destructive/10 px-4 py-1.5 text-center text-[11px] text-foreground/80">
           <AlertTriangle className="size-3.5 shrink-0 text-destructive" />
