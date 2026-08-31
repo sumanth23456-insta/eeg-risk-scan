@@ -52,9 +52,13 @@ export const getGateStatus = createServerFn({ method: "GET" }).handler(async () 
   return { unlocked: Boolean(session.data.unlocked), username: session.data.username ?? null };
 });
 
-/** Throws a redirect to /unlock when the shared credentials have not been entered. */
-export const requireUnlocked = createServerFn({ method: "GET" }).handler(async () => {
-  const session = await useSession<GateSession>(sessionConfig());
-  if (!session.data.unlocked) throw redirect({ to: "/unlock" });
-  return { unlocked: true as const, username: session.data.username ?? null };
-});
+/**
+ * Loader guard: asks the server for gate status and redirects in the loader
+ * itself (throwing the redirect inside the server fn surfaces as a raw
+ * Response error on the client).
+ */
+export async function requireUnlocked() {
+  const status = await getGateStatus();
+  if (!status.unlocked) throw redirect({ to: "/unlock" });
+  return status;
+}
