@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { requireUnlocked } from "@/lib/gate.functions";
 import { useEffect } from "react";
 import { Trash2, Download } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
@@ -26,6 +27,7 @@ export const Route = createFileRoute("/history")({
       },
     ],
   }),
+  loader: () => requireUnlocked(),
   component: HistoryPage,
 });
 
