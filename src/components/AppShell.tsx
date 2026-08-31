@@ -1,6 +1,7 @@
-import { Link } from "@tanstack/react-router";
-import { Activity, AlertTriangle } from "lucide-react";
-import type { ReactNode } from "react";
+import { Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { Activity, AlertTriangle, Lock, LogOut } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { getGateStatus, signOut } from "@/lib/gate.functions";
 
 const NAV = [
   { to: "/", label: "Dashboard" },
@@ -10,6 +11,51 @@ const NAV = [
   { to: "/history", label: "History" },
   { to: "/methodology", label: "Methodology" },
 ] as const;
+
+function GateControl() {
+  const navigate = useNavigate();
+  const router = useRouter();
+  const [status, setStatus] = useState<{ unlocked: boolean; username: string | null } | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    getGateStatus().then((s) => alive && setStatus(s)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (!status) return null;
+
+  if (!status.unlocked) {
+    return (
+      <Link
+        to="/unlock"
+        className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      >
+        <Lock className="size-3.5" /> Sign in
+      </Link>
+    );
+  }
+
+  return (
+    <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+      <span className="hidden sm:inline">Signed in as {status.username}</span>
+      <button
+        type="button"
+        onClick={async () => {
+          await signOut();
+          setStatus({ unlocked: false, username: null });
+          await router.invalidate();
+          await navigate({ to: "/", replace: true });
+        }}
+        className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 transition-colors hover:bg-accent hover:text-foreground"
+      >
+        <LogOut className="size-3.5" /> Sign out
+      </button>
+    </div>
+  );
+}
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -40,6 +86,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             ))}
           </nav>
+          <GateControl />
         </div>
         <div className="flex items-center justify-center gap-2 border-t border-border bg-destructive/10 px-4 py-1.5 text-center text-[11px] text-foreground/80">
           <AlertTriangle className="size-3.5 shrink-0 text-destructive" />

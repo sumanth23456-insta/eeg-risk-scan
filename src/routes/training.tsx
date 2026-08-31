@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { requireUnlocked } from "@/lib/gate.functions";
 import { useEffect, useState } from "react";
 import { Loader2, Brain } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
@@ -36,6 +37,7 @@ export const Route = createFileRoute("/training")({
       },
     ],
   }),
+  loader: () => requireUnlocked(),
   component: TrainingPage,
 });
 
