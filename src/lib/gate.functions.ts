@@ -14,7 +14,8 @@ function sessionConfig() {
       "neurorisk-dev-session-secret-change-me-please-32+",
     name: "neurorisk-gate",
     maxAge: 60 * 60 * 12,
-    cookie: { httpOnly: true, secure: true, sameSite: "lax" as const, path: "/" },
+    // "none" so the cookie survives the cross-site preview iframe; requires secure.
+    cookie: { httpOnly: true, secure: true, sameSite: "none" as const, path: "/" },
   };
 }
 
