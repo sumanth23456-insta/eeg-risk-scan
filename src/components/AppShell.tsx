@@ -12,6 +12,51 @@ const NAV = [
   { to: "/methodology", label: "Methodology" },
 ] as const;
 
+function GateControl() {
+  const navigate = useNavigate();
+  const router = useRouter();
+  const [status, setStatus] = useState<{ unlocked: boolean; username: string | null } | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    getGateStatus().then((s) => alive && setStatus(s)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (!status) return null;
+
+  if (!status.unlocked) {
+    return (
+      <Link
+        to="/unlock"
+        className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      >
+        <Lock className="size-3.5" /> Sign in
+      </Link>
+    );
+  }
+
+  return (
+    <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+      <span className="hidden sm:inline">Signed in as {status.username}</span>
+      <button
+        type="button"
+        onClick={async () => {
+          await signOut();
+          setStatus({ unlocked: false, username: null });
+          await router.invalidate();
+          await navigate({ to: "/", replace: true });
+        }}
+        className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 transition-colors hover:bg-accent hover:text-foreground"
+      >
+        <LogOut className="size-3.5" /> Sign out
+      </button>
+    </div>
+  );
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-background text-foreground">
