@@ -1,6 +1,7 @@
-import { Link } from "@tanstack/react-router";
-import { Activity, AlertTriangle } from "lucide-react";
-import type { ReactNode } from "react";
+import { Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { Activity, AlertTriangle, Lock, LogOut } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { getGateStatus, signOut } from "@/lib/gate.functions";
 
 const NAV = [
   { to: "/", label: "Dashboard" },
