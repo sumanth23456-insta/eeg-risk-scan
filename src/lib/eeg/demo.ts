@@ -148,13 +148,17 @@ export function buildDemoRecording(kind: EegClass | "evolving" = "evolving", fs 
     fileSize: 0,
     format: "DEMO",
     samplingRate: fs,
+    samplingRateSource: "generated",
     channelNames,
     data,
-    unit: "µV (synthetic)",
+    unit: "µV",
+    amplitudeUnit: "µV",
+    unitKnown: true,
+    timeColumn: null,
     source: "demo",
-    demoLabel: "Synthetic / Demo Data — not a real patient recording",
+    demoLabel: "Synthetic EEG — for testing/demo purposes only (not a real patient recording)",
     notes: [
-      "SYNTHETIC DEMO DATA. Generated deterministically in the browser.",
+      "Synthetic EEG — for testing/demo purposes only. Generated deterministically in the browser.",
       kind === "evolving"
         ? "Structure: 0–50 s interictal-like, 50–90 s preictal-like, 90–120 s ictal-like."
         : `Structure: uniform ${kind}-like activity.`,
