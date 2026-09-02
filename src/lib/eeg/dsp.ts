@@ -312,8 +312,21 @@ export const BANDS: Record<string, [number, number]> = {
   theta: [4, 8],
   alpha: [8, 13],
   beta: [13, 30],
-  gamma: [30, 100],
+  gamma: [30, 45],
 };
+
+/**
+ * Relative power contained in a narrow band around the mains frequency
+ * (f0 +/- bw) compared with the 0.5-fMax total. Used to detect and to verify
+ * removal of power-line interference. Returns 0..1.
+ */
+export function powerlineRatio(sp: Spectrum, f0: number, fMax: number, bw = 2): number {
+  const nyq = sp.freqs[sp.freqs.length - 1] ?? 0;
+  if (f0 + bw > nyq) return 0;
+  const line = bandPower(sp, f0 - bw, f0 + bw);
+  const total = bandPower(sp, 0.5, Math.max(f0 + bw + 1, fMax));
+  return total > 1e-15 ? Math.min(1, line / total) : 0;
+}
 
 export function bandPower(sp: Spectrum, lo: number, hi: number): number {
   let s = 0;
@@ -323,11 +336,11 @@ export function bandPower(sp: Spectrum, lo: number, hi: number): number {
   return s;
 }
 
-export function dominantFrequency(sp: Spectrum, minF = 0.5): number {
+export function dominantFrequency(sp: Spectrum, minF = 0.5, maxF = Infinity): number {
   let best = 0;
   let f = 0;
   for (let k = 0; k < sp.freqs.length; k++) {
-    if (sp.freqs[k] < minF) continue;
+    if (sp.freqs[k] < minF || sp.freqs[k] > maxF) continue;
     if (sp.psd[k] > best) {
       best = sp.psd[k];
       f = sp.freqs[k];

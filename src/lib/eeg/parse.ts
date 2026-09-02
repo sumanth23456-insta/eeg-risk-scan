@@ -1,7 +1,22 @@
 /**
  * EEG file parsing: CSV / TXT (user-declared metadata) and EDF/EDF+ (header parsed).
  * The uploaded buffer is never modified; parsing produces a new in-memory recording.
+ *
+ * Column handling contract:
+ *  - a time/index column is detected by NAME and by numeric behaviour and is
+ *    NEVER exposed as an EEG channel;
+ *  - the sampling rate is derived from the time column when one exists;
+ *  - amplitudes are converted to microvolts before anything downstream runs.
  */
+import {
+  isTimeColumnName,
+  looksLikeTimeSeriesAxis,
+  samplingRateFromTime,
+  suggestAmplitudeUnit,
+  toMicrovoltFactor,
+  type AmplitudeUnit,
+} from "./validation";
+import { rms as rmsOf } from "./dsp";
 
 export interface EegRecording {
   id: string;
@@ -9,10 +24,17 @@ export interface EegRecording {
   fileSize: number;
   format: "CSV" | "TXT" | "EDF" | "DEMO";
   samplingRate: number;
-  channelNames: string[];
-  data: Float64Array[]; // per channel
+  /** How the sampling rate was obtained. */
+  samplingRateSource: "time-column" | "user" | "header" | "generated";
+  channelNames: string[]; // EEG channels only — never the time column
+  data: Float64Array[]; // per EEG channel, always in µV
   durationSec: number;
   unit: string;
+  amplitudeUnit: AmplitudeUnit;
+  /** false when no unit metadata existed and a unit was assumed. */
+  unitKnown: boolean;
+  /** Name of the detected time column, or null when the file has none. */
+  timeColumn: string | null;
   source: "upload" | "demo";
   demoLabel?: string;
   notes: string[];
@@ -29,7 +51,10 @@ export interface CsvOptions {
   hasHeader: boolean;
   delimiter: "," | ";" | "\t" | " " | "auto";
   channelNames?: string[];
+  /** Legacy hint; automatic detection takes precedence. */
   timeColumnFirst: boolean;
+  /** "auto" = not declared by the user; data is then treated as µV but flagged. */
+  amplitudeUnit?: AmplitudeUnit | "auto";
 }
 
 function detectDelimiter(line: string): string {
@@ -75,33 +100,101 @@ export function parseDelimitedText(
   if (!rows.length) throw new Error("No numeric rows found in file.");
 
   const nCols = Math.max(...rows.map((r) => r.length));
-  const startCol = opts.timeColumnFirst ? 1 : 0;
-  const nCh = Math.max(1, nCols - startCol);
-
-  const data: Float64Array[] = [];
-  for (let c = 0; c < nCh; c++) {
-    const arr = new Float64Array(rows.length);
-    for (let r = 0; r < rows.length; r++) arr[r] = rows[r][c + startCol];
-    data.push(arr);
-  }
-
-  let names =
-    opts.channelNames && opts.channelNames.length === nCh
-      ? opts.channelNames
-      : headerNames
-        ? headerNames.slice(startCol, startCol + nCh)
-        : Array.from({ length: nCh }, (_, i) => `CH${i + 1}`);
-  if (names.length !== nCh) names = Array.from({ length: nCh }, (_, i) => `CH${i + 1}`);
+  const columnName = (i: number) => headerNames?.[i]?.trim() || `COL${i + 1}`;
+  const column = (i: number) => rows.map((r) => r[i]);
 
   const notes: string[] = [];
-  let fs = opts.samplingRate;
-  if (opts.timeColumnFirst && rows.length > 2) {
-    const dt = rows[1][0] - rows[0][0];
-    if (Number.isFinite(dt) && dt > 0) {
-      const derived = 1 / dt;
-      notes.push(`Sampling rate derived from time column: ${derived.toFixed(2)} Hz.`);
-      fs = derived;
+
+  /* ---------------------- 1. time column identification ---------------------- */
+  let timeIdx = -1;
+  for (let c = 0; c < nCols; c++) {
+    if (headerNames && isTimeColumnName(columnName(c))) {
+      timeIdx = c;
+      break;
     }
+  }
+  if (timeIdx < 0 && nCols > 1) {
+    // no name match: fall back to numeric behaviour of the first column
+    const first = column(0).filter((v) => Number.isFinite(v));
+    if ((opts.timeColumnFirst && looksLikeTimeSeriesAxis(first)) || looksLikeTimeSeriesAxis(first)) {
+      timeIdx = 0;
+    }
+  }
+  const timeColumn = timeIdx >= 0 ? columnName(timeIdx) : null;
+  if (timeColumn) notes.push(`Time column detected: ${timeColumn} (excluded from EEG channels).`);
+  else notes.push("No time column detected — every numeric column is treated as an EEG channel.");
+
+  /* ------------------------- 2. EEG channel extraction ----------------------- */
+  const eegIdx: number[] = [];
+  for (let c = 0; c < nCols; c++) {
+    if (c === timeIdx) continue;
+    const col = column(c);
+    const finite = col.filter((v) => Number.isFinite(v)).length;
+    if (finite / (col.length || 1) < 0.5) {
+      notes.push(`Column "${columnName(c)}" ignored — fewer than 50% numeric values.`);
+      continue;
+    }
+    eegIdx.push(c);
+  }
+  if (!eegIdx.length) {
+    throw new Error(
+      "No valid EEG channel found. The file must contain at least one numeric channel column besides the time column.",
+    );
+  }
+
+  const providedNames =
+    opts.channelNames && opts.channelNames.length === eegIdx.length ? opts.channelNames : null;
+  const names = eegIdx.map((c, i) =>
+    providedNames ? providedNames[i] : headerNames ? columnName(c) : `CH${i + 1}`,
+  );
+  notes.push(`EEG channels detected: ${names.length} (${names.join(", ")}).`);
+
+  const data: Float64Array[] = eegIdx.map((c) => {
+    const arr = new Float64Array(rows.length);
+    for (let r = 0; r < rows.length; r++) arr[r] = rows[r][c];
+    return arr;
+  });
+
+  /* ------------------------- 3. sampling-rate handling ----------------------- */
+  let fs = opts.samplingRate;
+  let fsSource: EegRecording["samplingRateSource"] = "user";
+  if (timeIdx >= 0) {
+    const info = samplingRateFromTime(column(timeIdx).filter((v) => Number.isFinite(v)));
+    if (info && info.fs > 0) {
+      fs = info.fs;
+      fsSource = "time-column";
+      notes.push(
+        `Sampling rate derived from ${timeColumn}: ${info.fs.toFixed(2)} Hz (median step ${info.medianStep.toExponential(3)} s).`,
+      );
+      if (!info.uniform) {
+        notes.push(
+          `Non-uniform sampling interval: ${(info.jitterRatio * 100).toFixed(1)}% of steps deviate >25% from the median. Spectral results may be distorted.`,
+        );
+      }
+      const declared = opts.samplingRate;
+      if (Number.isFinite(declared) && declared > 0 && Math.abs(declared - info.fs) / info.fs > 0.05) {
+        notes.push(
+          `Sampling-rate mismatch: file time column implies ${info.fs.toFixed(2)} Hz but ${declared} Hz was entered manually. The time-column value is used — verify the file.`,
+        );
+      }
+    }
+  }
+
+  /* ----------------------------- 4. amplitude unit --------------------------- */
+  const declaredUnit = opts.amplitudeUnit && opts.amplitudeUnit !== "auto" ? opts.amplitudeUnit : null;
+  const typicalRms = data.length ? rmsOf(data[0]) : 0;
+  const unitKnown = Boolean(declaredUnit);
+  const amplitudeUnit: AmplitudeUnit = declaredUnit ?? "µV";
+  if (!declaredUnit) {
+    const suggested = suggestAmplitudeUnit(typicalRms);
+    notes.push(
+      `EEG amplitude unit not explicitly provided — values are treated as µV. Signal RMS is ${typicalRms.toExponential(2)}, which is typical of ${suggested === "unknown" ? "an undetermined scale" : suggested}. Select the correct unit if this is wrong.`,
+    );
+  }
+  const factor = toMicrovoltFactor(amplitudeUnit);
+  if (factor !== 1) {
+    for (const ch of data) for (let i = 0; i < ch.length; i++) ch[i] *= factor;
+    notes.push(`Amplitudes converted from ${amplitudeUnit} to µV (×${factor}).`);
   }
 
   return finalize({
@@ -109,9 +202,13 @@ export function parseDelimitedText(
     fileSize,
     format: fileName.toLowerCase().endsWith(".txt") ? "TXT" : "CSV",
     samplingRate: fs,
+    samplingRateSource: fsSource,
     channelNames: names,
     data,
-    unit: "µV (assumed)",
+    unit: "µV",
+    amplitudeUnit,
+    unitKnown,
+    timeColumn,
     source: "upload",
     notes,
   });
@@ -163,7 +260,9 @@ export function parseEdf(buffer: ArrayBuffer, fileName: string, fileSize: number
   const view = new DataView(buffer);
   const keep = labels
     .map((l, i) => ({ l, i }))
-    .filter(({ l, i }) => !/EDF Annotations/i.test(l) && samplesPerRecord[i] > 0);
+    .filter(({ l, i }) => !/EDF Annotations/i.test(l) && samplesPerRecord[i] > 0 && !isTimeColumnName(l));
+
+  if (!keep.length) throw new Error("No valid EEG channel found in the EDF file.");
 
   const data: Float64Array[] = keep.map(({ i }) => new Float64Array(samplesPerRecord[i] * numRecords));
   const writeIdx = keep.map(() => 0);
@@ -187,17 +286,28 @@ export function parseEdf(buffer: ArrayBuffer, fileName: string, fileSize: number
   }
 
   const fs = samplesPerRecord[keep[0].i] / (recordDuration || 1);
+  const dim = (dims[keep[0].i] || "uV").toLowerCase();
+  const amplitudeUnit: AmplitudeUnit = dim.startsWith("mv") ? "mV" : dim === "v" ? "V" : "µV";
+  const factor = toMicrovoltFactor(amplitudeUnit);
+  if (factor !== 1) for (const ch of data) for (let i = 0; i < ch.length; i++) ch[i] *= factor;
+
   return finalize({
     fileName,
     fileSize,
     format: "EDF",
     samplingRate: fs,
+    samplingRateSource: "header",
     channelNames: keep.map(({ l }, idx) => l || `CH${idx + 1}`),
     data,
-    unit: dims[keep[0].i] || "µV",
+    unit: "µV",
+    amplitudeUnit,
+    unitKnown: true,
+    timeColumn: null,
     source: "upload",
     notes: [
       `EDF header parsed: ${numRecords} data records × ${recordDuration} s.`,
+      `EEG channels detected: ${keep.length} (${keep.map((k) => k.l).join(", ")}).`,
+      `Amplitude unit from EDF header: ${amplitudeUnit}${factor !== 1 ? ` (converted to µV, ×${factor})` : ""}.`,
       `Patient/recording identification fields were intentionally NOT imported.`,
     ],
   });
@@ -228,12 +338,13 @@ export function finalize(r: Omit<EegRecording, "id" | "durationSec" | "quality">
   const messages: string[] = [];
   if (invalidRatio > 0) messages.push(`${(invalidRatio * 100).toFixed(2)}% invalid/missing samples detected.`);
   if (flat.length) messages.push(`Flat channels: ${flat.join(", ")}.`);
-  if (r.samplingRate < 100) messages.push("Sampling rate below 100 Hz — gamma band cannot be evaluated.");
+  if (r.samplingRate < 128)
+    messages.push("Sampling rate below 128 Hz — the 30–45 Hz gamma band cannot be fully evaluated.");
   if (durationSec < 5) messages.push("Recording shorter than 5 s — analysis may be unreliable.");
   const status: "good" | "fair" | "poor" =
     invalidRatio > 0.05 || flat.length === r.data.length || durationSec < 2
       ? "poor"
-      : invalidRatio > 0.001 || flat.length > 0 || r.samplingRate < 100
+      : invalidRatio > 0.001 || flat.length > 0 || r.samplingRate < 128
         ? "fair"
         : "good";
 
