@@ -485,15 +485,24 @@ export function assessRisk(input: RiskInput): RiskResult {
   const shortSegment = segmentSeconds < 5;
   let confidence = Math.max(0, Math.min(100, maxP * 100 * (1 - penalty) * (shortSegment ? 0.6 : 1)));
 
-  const uncertain = maxP < 0.45 || shortSegment || penalty > 0.5;
-  const classification: Classification = uncertain
-    ? "Uncertain / Insufficient Data"
-    : predictedClass === "interictal"
-      ? "Normal / Interictal Pattern"
-      : predictedClass === "preictal"
-        ? "Possible Preictal Pattern"
-        : "Possible Ictal Pattern";
+  const powerline = input.powerlineRatio ?? 0;
+  const eligible = input.eligible !== false;
+  const uncertain = !eligible || powerline > 0.3 || maxP < 0.45 || shortSegment || penalty > 0.5;
+  const classification: Classification = !eligible
+    ? powerline > 0.3
+      ? "Unreliable / Power-line Interference"
+      : "Unreliable / Insufficient-Quality Signal"
+    : powerline > 0.3
+      ? "Unreliable / Power-line Interference"
+      : uncertain
+        ? "Uncertain / Insufficient Data"
+        : predictedClass === "interictal"
+          ? "Normal / Interictal Pattern"
+          : predictedClass === "preictal"
+            ? "Possible Preictal Pattern"
+            : "Possible Ictal Pattern";
   if (uncertain) confidence = Math.min(confidence, 50);
+
 
   return {
     probs,
