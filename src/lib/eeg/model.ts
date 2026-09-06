@@ -426,11 +426,17 @@ export function explain(model: TrainedModel, f: FeatureVector, classIdx: number)
     .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution));
 }
 
+/** Preprocessing configuration used to build the reference/synthetic dataset. */
+export const REFERENCE_PREPROCESS_LABEL =
+  "Band-pass 0.5–45 Hz (zero-phase FIR) · 50 Hz notch · DC removal · 8×MAD outlier limiting · amplitude in µV · fs 256 Hz";
+
 export type Classification =
   | "Normal / Interictal Pattern"
   | "Possible Preictal Pattern"
   | "Possible Ictal Pattern"
-  | "Uncertain / Insufficient Data";
+  | "Uncertain / Insufficient Data"
+  | "Unreliable / Insufficient-Quality Signal"
+  | "Unreliable / Power-line Interference";
 
 export interface RiskResult {
   probs: Record<EegClass, number>;
@@ -449,7 +455,14 @@ export interface RiskInput {
   table: ReferenceTable;
   qualityPenalty?: number; // 0..1, reduces confidence
   segmentSeconds: number;
+  /** Whether the signal passed EEG sanity checks; false blocks classification. */
+  eligible?: boolean;
+  /** Human-readable reason when not eligible. */
+  ineligibleReason?: string;
+  /** Residual power-line power ratio after notch filtering (0..1). */
+  powerlineRatio?: number;
 }
+
 
 /**
  * Risk score = 100 * (0.85 * P(preictal) + 1.0 * P(ictal)).
