@@ -426,11 +426,17 @@ export function explain(model: TrainedModel, f: FeatureVector, classIdx: number)
     .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution));
 }
 
+/** Preprocessing configuration used to build the reference/synthetic dataset. */
+export const REFERENCE_PREPROCESS_LABEL =
+  "Band-pass 0.5–45 Hz (zero-phase FIR) · 50 Hz notch · DC removal · 8×MAD outlier limiting · amplitude in µV · fs 256 Hz";
+
 export type Classification =
   | "Normal / Interictal Pattern"
   | "Possible Preictal Pattern"
   | "Possible Ictal Pattern"
-  | "Uncertain / Insufficient Data";
+  | "Uncertain / Insufficient Data"
+  | "Unreliable / Insufficient-Quality Signal"
+  | "Unreliable / Power-line Interference";
 
 export interface RiskResult {
   probs: Record<EegClass, number>;
@@ -449,7 +455,14 @@ export interface RiskInput {
   table: ReferenceTable;
   qualityPenalty?: number; // 0..1, reduces confidence
   segmentSeconds: number;
+  /** Whether the signal passed EEG sanity checks; false blocks classification. */
+  eligible?: boolean;
+  /** Human-readable reason when not eligible. */
+  ineligibleReason?: string;
+  /** Residual power-line power ratio after notch filtering (0..1). */
+  powerlineRatio?: number;
 }
+
 
 /**
  * Risk score = 100 * (0.85 * P(preictal) + 1.0 * P(ictal)).
@@ -472,15 +485,24 @@ export function assessRisk(input: RiskInput): RiskResult {
   const shortSegment = segmentSeconds < 5;
   let confidence = Math.max(0, Math.min(100, maxP * 100 * (1 - penalty) * (shortSegment ? 0.6 : 1)));
 
-  const uncertain = maxP < 0.45 || shortSegment || penalty > 0.5;
-  const classification: Classification = uncertain
-    ? "Uncertain / Insufficient Data"
-    : predictedClass === "interictal"
-      ? "Normal / Interictal Pattern"
-      : predictedClass === "preictal"
-        ? "Possible Preictal Pattern"
-        : "Possible Ictal Pattern";
+  const powerline = input.powerlineRatio ?? 0;
+  const eligible = input.eligible !== false;
+  const uncertain = !eligible || powerline > 0.3 || maxP < 0.45 || shortSegment || penalty > 0.5;
+  const classification: Classification = !eligible
+    ? powerline > 0.3
+      ? "Unreliable / Power-line Interference"
+      : "Unreliable / Insufficient-Quality Signal"
+    : powerline > 0.3
+      ? "Unreliable / Power-line Interference"
+      : uncertain
+        ? "Uncertain / Insufficient Data"
+        : predictedClass === "interictal"
+          ? "Normal / Interictal Pattern"
+          : predictedClass === "preictal"
+            ? "Possible Preictal Pattern"
+            : "Possible Ictal Pattern";
   if (uncertain) confidence = Math.min(confidence, 50);
+
 
   return {
     probs,
