@@ -5,12 +5,15 @@ import { getGateStatus, signOut } from "@/lib/gate.functions";
 
 const NAV = [
   { to: "/", label: "Dashboard" },
+  { to: "/patient", label: "Patient & Clinical" },
   { to: "/upload", label: "Upload" },
   { to: "/analysis", label: "Analysis" },
+  { to: "/screening", label: "Screening" },
   { to: "/training", label: "Model Training" },
   { to: "/history", label: "History" },
   { to: "/methodology", label: "Methodology" },
 ] as const;
+
 
 function GateControl() {
   const navigate = useNavigate();
