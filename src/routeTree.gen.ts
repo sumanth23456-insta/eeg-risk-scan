@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AnalysisRouteImport } from './routes/analysis'
 import { Route as HistoryRouteImport } from './routes/history'
 import { Route as MethodologyRouteImport } from './routes/methodology'
+import { Route as PatientRouteImport } from './routes/patient'
 import { Route as TrainingRouteImport } from './routes/training'
 import { Route as UnlockRouteImport } from './routes/unlock'
 import { Route as UploadRouteImport } from './routes/upload'
@@ -37,6 +38,11 @@ const MethodologyRoute = MethodologyRouteImport.update({
   path: '/methodology',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PatientRoute = PatientRouteImport.update({
+  id: '/patient',
+  path: '/patient',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TrainingRoute = TrainingRouteImport.update({
   id: '/training',
   path: '/training',
@@ -58,6 +64,7 @@ export interface FileRoutesByFullPath {
   '/analysis': typeof AnalysisRoute
   '/history': typeof HistoryRoute
   '/methodology': typeof MethodologyRoute
+  '/patient': typeof PatientRoute
   '/training': typeof TrainingRoute
   '/unlock': typeof UnlockRoute
   '/upload': typeof UploadRoute
@@ -67,6 +74,7 @@ export interface FileRoutesByTo {
   '/analysis': typeof AnalysisRoute
   '/history': typeof HistoryRoute
   '/methodology': typeof MethodologyRoute
+  '/patient': typeof PatientRoute
   '/training': typeof TrainingRoute
   '/unlock': typeof UnlockRoute
   '/upload': typeof UploadRoute
@@ -77,6 +85,7 @@ export interface FileRoutesById {
   '/analysis': typeof AnalysisRoute
   '/history': typeof HistoryRoute
   '/methodology': typeof MethodologyRoute
+  '/patient': typeof PatientRoute
   '/training': typeof TrainingRoute
   '/unlock': typeof UnlockRoute
   '/upload': typeof UploadRoute
@@ -88,6 +97,7 @@ export interface FileRouteTypes {
     | '/analysis'
     | '/history'
     | '/methodology'
+    | '/patient'
     | '/training'
     | '/unlock'
     | '/upload'
@@ -97,6 +107,7 @@ export interface FileRouteTypes {
     | '/analysis'
     | '/history'
     | '/methodology'
+    | '/patient'
     | '/training'
     | '/unlock'
     | '/upload'
@@ -106,6 +117,7 @@ export interface FileRouteTypes {
     | '/analysis'
     | '/history'
     | '/methodology'
+    | '/patient'
     | '/training'
     | '/unlock'
     | '/upload'
@@ -116,6 +128,7 @@ export interface RootRouteChildren {
   AnalysisRoute: typeof AnalysisRoute
   HistoryRoute: typeof HistoryRoute
   MethodologyRoute: typeof MethodologyRoute
+  PatientRoute: typeof PatientRoute
   TrainingRoute: typeof TrainingRoute
   UnlockRoute: typeof UnlockRoute
   UploadRoute: typeof UploadRoute
@@ -151,6 +164,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MethodologyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/patient': {
+      id: '/patient'
+      path: '/patient'
+      fullPath: '/patient'
+      preLoaderRoute: typeof PatientRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/training': {
       id: '/training'
       path: '/training'
@@ -180,6 +200,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnalysisRoute: AnalysisRoute,
   HistoryRoute: HistoryRoute,
   MethodologyRoute: MethodologyRoute,
+  PatientRoute: PatientRoute,
   TrainingRoute: TrainingRoute,
   UnlockRoute: UnlockRoute,
   UploadRoute: UploadRoute,
