@@ -50,14 +50,17 @@ function Dashboard() {
             Learning. All signal processing runs locally in your browser.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button asChild>
-            <Link to="/upload">
-              <FileUp className="size-4" /> Upload recording
+            <Link to="/patient">
+              <FileUp className="size-4" /> Patient & clinical entry
             </Link>
           </Button>
           <Button asChild variant="secondary">
-            <Link to="/analysis">Open analysis</Link>
+            <Link to="/upload">Upload EEG recording</Link>
+          </Button>
+          <Button asChild variant="secondary">
+            <Link to="/screening">Screening result</Link>
           </Button>
         </div>
       </div>

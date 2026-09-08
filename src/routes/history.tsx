@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { clearHistory, getState, hydrateHistory, openAnalysis, useAppState } from "@/lib/eeg/store";
 import { generateReport } from "@/lib/eeg/report";
+import { generateScreeningReport } from "@/lib/fissure/report";
+import { clearRecords, hydrateFissure, useFissureState } from "@/lib/fissure/store";
 import { fmtDate, fmtTime, riskColorVar } from "@/lib/eeg/ui";
 
 export const Route = createFileRoute("/history")({
@@ -33,10 +35,12 @@ export const Route = createFileRoute("/history")({
 
 function HistoryPage() {
   const s = useAppState();
+  const f = useFissureState();
   const navigate = useNavigate();
 
   useEffect(() => {
     hydrateHistory();
+    hydrateFissure();
   }, []);
 
   return (
@@ -135,6 +139,73 @@ function HistoryPage() {
                 })}
               </TableBody>
             </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Research screening records</CardTitle>
+          <CardDescription>
+            Saved patient + clinical records with their screening outcome ({f.records.length}).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          {f.records.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No screening records saved yet. Enter patient and clinical parameters, then save the
+              result.
+            </p>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Patient ID</TableHead>
+                    <TableHead>Age / sex</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead className="text-right">Score</TableHead>
+                    <TableHead>EEG</TableHead>
+                    <TableHead className="text-right">Report</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {f.records.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                        {fmtDate(r.createdAt)}
+                      </TableCell>
+                      <TableCell>{r.patient.patientId || "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {r.patient.age ?? "—"} / {r.patient.sex || "—"}
+                      </TableCell>
+                      <TableCell>{r.screening.category}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {r.screening.score ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {r.eeg ? (r.eeg.source === "demo" ? "Synthetic demo" : r.eeg.fileName) : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => generateScreeningReport(r)}
+                        >
+                          <Download className="size-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <div className="mt-4">
+                <Button variant="outline" size="sm" onClick={clearRecords}>
+                  <Trash2 className="size-4" /> Clear screening records
+                </Button>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
