@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { clearHistory, getState, hydrateHistory, openAnalysis, useAppState } from "@/lib/eeg/store";
 import { generateReport } from "@/lib/eeg/report";
+import { generateScreeningReport } from "@/lib/fissure/report";
+import { clearRecords, hydrateFissure, useFissureState } from "@/lib/fissure/store";
 import { fmtDate, fmtTime, riskColorVar } from "@/lib/eeg/ui";
 
 export const Route = createFileRoute("/history")({
