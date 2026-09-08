@@ -35,10 +35,12 @@ export const Route = createFileRoute("/history")({
 
 function HistoryPage() {
   const s = useAppState();
+  const f = useFissureState();
   const navigate = useNavigate();
 
   useEffect(() => {
     hydrateHistory();
+    hydrateFissure();
   }, []);
 
   return (
