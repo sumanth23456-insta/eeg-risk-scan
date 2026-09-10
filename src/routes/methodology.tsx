@@ -119,6 +119,24 @@ function MethodologyPage() {
             <li>Preictal state definitions vary widely across the literature.</li>
             <li>No prospective, patient-level or cross-dataset evaluation.</li>
             <li>Synthetic demo data cannot represent real epileptiform morphology.</li>
+            <li>
+              Gamma is reported over 30–45 Hz only. The band-pass ceiling is 45 Hz, so gamma content
+              above 45 Hz is never analysed even when the sampling rate would allow it.
+            </li>
+            <li>
+              The Daubechies-4 decomposition is a circular (periodic) approximation of the discrete
+              wavelet transform — edge samples wrap around instead of being reflected or zero-padded,
+              so the first and last coefficients of each level carry boundary error.
+            </li>
+            <li>
+              Sample entropy is computed on a subsample capped at 800 points to keep the O(N²)
+              comparison tractable. Entropy values from windows of very different lengths are
+              therefore not directly comparable.
+            </li>
+            <li>
+              The channel-consistency filter excludes channels whose RMS is 6× off the group median;
+              on heterogeneous montages this can drop a legitimately different brain region.
+            </li>
           </ul>
         </Section>
       </div>
