@@ -345,8 +345,15 @@ export interface AnalysisResult {
   technical: TechnicalInfo;
 }
 
+/** Default RMS outlier factor used by the optional channel-consistency filter. */
+export const DEFAULT_CHANNEL_RMS_FACTOR = 6;
+
 export interface RunAnalysisArgs {
   recording: EegRecording;
+  /** Set false to keep amplitude-heterogeneous channels (real multi-region montages). */
+  channelConsistency?: boolean;
+  /** RMS outlier factor for the consistency filter (default 6). */
+  channelConsistencyFactor?: number;
   /** EEG channel indices to analyse. Defaults to all channels. */
   channelIndices?: number[];
   /** Legacy single-channel entry point. */
