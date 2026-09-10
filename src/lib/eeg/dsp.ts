@@ -237,15 +237,23 @@ export function detectClipping(x: Signal, minFraction = 0.005): boolean {
   if (!Number.isFinite(span) || span < 1e-12) return false; // flat signal, handled separately
   const tol = span * 0.002;
 
+  // a rail is a run of >= 3 consecutive, essentially identical samples sitting in
+  // the tolerance band at the extreme — a rounded sine trough does not qualify
+  const flat = span * 1e-4;
   const railRun = (isRail: (v: number) => boolean) => {
     let railed = 0;
     let run = 0;
+    let runValue = 0;
     for (let i = 0; i <= n; i++) {
-      const on = i < n && Number.isFinite(x[i]) && isRail(x[i]);
-      if (on) run++;
-      else {
-        if (run >= 3) railed += run; // only sustained runs count as a rail
-        run = 0;
+      const v = i < n ? x[i] : NaN;
+      const on = i < n && Number.isFinite(v) && isRail(v) && (run === 0 || Math.abs(v - runValue) <= flat);
+      if (on) {
+        if (run === 0) runValue = v;
+        run++;
+      } else {
+        if (run >= 3) railed += run;
+        run = i < n && Number.isFinite(v) && isRail(v) ? 1 : 0;
+        runValue = v;
       }
     }
     return railed / n;
