@@ -9,33 +9,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { signIn } from "@/lib/gate.functions";
+import { setRole, type TrialRole } from "@/lib/trialbridge/store";
 
 export const Route = createFileRoute("/unlock")({
-  head: () => ({
-    meta: [
-      { title: "Restricted Access — NeuroRisk EEG" },
-      {
-        name: "description",
-        content:
-          "Enter the shared research credentials to access model training and analysis history.",
-      },
-      { property: "og:title", content: "Restricted Access — NeuroRisk EEG" },
-      {
-        property: "og:description",
-        content: "Shared credentials are required for the restricted research areas.",
-      },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-  }),
   component: UnlockPage,
 });
+
+const ROLES: TrialRole[] = ["Admin", "PI", "Coordinator", "Monitor", "Participant", "Sponsor"];
 
 function UnlockPage() {
   const navigate = useNavigate();
   const submit = useServerFn(signIn);
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [role, setLocalRole] = useState<TrialRole>("Coordinator");
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -49,8 +36,12 @@ function UnlockPage() {
           password: String(form.get("password") ?? ""),
         },
       });
-      if (res.ok) await navigate({ to: "/training" });
-      else setError(true);
+      if (res.ok) {
+        setRole(role);
+        await navigate({ to: "/" });
+      } else {
+        setError(true);
+      }
     } finally {
       setBusy(false);
     }
@@ -63,10 +54,10 @@ function UnlockPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Lock className="size-4 text-primary" />
-              Restricted research area
+              Sign in & choose role
             </CardTitle>
             <CardDescription>
-              Model Training and Analysis History require the shared laboratory credentials.
+              Access trial operations views with an explicit role context.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -85,20 +76,31 @@ function UnlockPage() {
                   required
                 />
               </div>
-              {error && (
+              <div className="space-y-1.5">
+                <Label htmlFor="role">Role</Label>
+                <select
+                  id="role"
+                  value={role}
+                  onChange={(e) => setLocalRole(e.target.value as TrialRole)}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  {ROLES.map((entry) => (
+                    <option key={entry} value={entry}>
+                      {entry}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {error ? (
                 <Alert variant="destructive">
                   <ShieldAlert className="size-4" />
                   <AlertTitle>Access denied</AlertTitle>
                   <AlertDescription>Incorrect username or password.</AlertDescription>
                 </Alert>
-              )}
+              ) : null}
               <Button type="submit" className="w-full" disabled={busy}>
-                {busy ? "Verifying…" : "Unlock"}
+                {busy ? "Verifying…" : "Continue"}
               </Button>
-              <p className="text-xs text-muted-foreground">
-                Shared credentials are a lightweight access gate, not per-user authentication. They
-                do not protect patient data and no EEG data leaves this browser.
-              </p>
             </form>
           </CardContent>
         </Card>
