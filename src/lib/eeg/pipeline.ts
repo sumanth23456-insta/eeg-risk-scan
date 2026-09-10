@@ -489,13 +489,17 @@ export function runAnalysis(args: RunAnalysisArgs): AnalysisResult {
     }
   }
 
-  // channel-consistency check: a channel whose RMS is wildly off the group is suspect
+  // channel-consistency check: a channel whose RMS is wildly off the group is suspect.
+  // Optional, because heterogeneous montages (temporal vs. frontal) legitimately
+  // differ in baseline amplitude — see RunAnalysisArgs.channelConsistency.
+  const consistencyFactor =
+    args.channelConsistency === false ? 0 : (args.channelConsistencyFactor ?? DEFAULT_CHANNEL_RMS_FACTOR);
   const includedRms = reports.filter((r) => r.included).map((r) => r.rms);
-  if (includedRms.length >= 4) {
+  if (consistencyFactor > 1 && includedRms.length >= 4) {
     const medRms = median(includedRms);
     for (const r of reports) {
       if (!r.included) continue;
-      if (medRms > 1e-9 && (r.rms > 6 * medRms || r.rms < medRms / 6)) {
+      if (medRms > 1e-9 && (r.rms > consistencyFactor * medRms || r.rms < medRms / consistencyFactor)) {
         r.included = false;
         r.quality = r.quality === "Good" ? "Poor" : r.quality;
         r.exclusionReason = `amplitude inconsistent with the other channels (RMS ${r.rms.toFixed(1)} vs median ${medRms.toFixed(1)} µV)`;
