@@ -670,7 +670,6 @@ export function runAnalysis(args: RunAnalysisArgs): AnalysisResult {
     id: `an_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
     createdAt: new Date().toISOString(),
     recordingId: recording.id,
-    recordingId_: recording.id,
     fileName: recording.fileName,
     source: recording.source,
     recordingLabel: recording.demoLabel,
