@@ -1,204 +1,110 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect } from "react";
-import { Activity, Brain, Database, FileUp, LineChart, ShieldAlert } from "lucide-react";
+import { useMemo } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAppState, hydrateHistory, ensureReference } from "@/lib/eeg/store";
-import { fmt, fmtDate, riskColorVar } from "@/lib/eeg/ui";
-import { backendStatus } from "@/lib/eeg/backend";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { getSitePerformance, getStageCounts, useTrialBridgeState } from "@/lib/trialbridge/store";
 
 export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "NeuroRisk EEG — Early Seizure Risk Assessment Dashboard" },
-      {
-        name: "description",
-        content:
-          "Research dashboard for EEG parameter-based early seizure risk assessment using pattern comparison and machine learning.",
-      },
-      { property: "og:title", content: "NeuroRisk EEG — Early Seizure Risk Assessment" },
-      {
-        property: "og:description",
-        content:
-          "Upload EEG recordings, extract time, frequency, nonlinear and wavelet parameters, and compute a research risk score.",
-      },
-    ],
-  }),
   component: Dashboard,
 });
 
 function Dashboard() {
-  const s = useAppState();
-
-  useEffect(() => {
-    hydrateHistory();
-    ensureReference();
-  }, []);
-
-  const backend = backendStatus();
-  const last = s.history[0];
+  const state = useTrialBridgeState();
+  const stages = useMemo(() => getStageCounts(state.participants), [state.participants]);
+  const siteMetrics = useMemo(() => getSitePerformance(state), [state]);
+  const openTasks = state.tasks.filter((task) => !task.done);
 
   return (
     <AppShell>
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            EEG Parameter-Based Early Seizure Risk Assessment Using Pattern Comparison and Machine
-            Learning. All signal processing runs locally in your browser.
+          <h1 className="text-2xl font-semibold tracking-tight">Coordinator dashboard</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Real-time trial operations snapshot across recruitment, eligibility, consent, tasks and
+            sites.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex gap-2">
           <Button asChild>
-            <Link to="/patient">
-              <FileUp className="size-4" /> Patient & clinical entry
-            </Link>
+            <Link to="/analysis">Run AI screening</Link>
           </Button>
-          <Button asChild variant="secondary">
-            <Link to="/upload">Upload EEG recording</Link>
-          </Button>
-          <Button asChild variant="secondary">
-            <Link to="/screening">Screening result</Link>
+          <Button variant="secondary" asChild>
+            <Link to="/screening">Capture consent</Link>
           </Button>
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          icon={<Activity className="size-4" />}
-          label="Loaded recording"
-          value={s.recording ? s.recording.fileName : "None"}
-          hint={
-            s.recording
-              ? `${s.recording.channelNames.length} ch · ${s.recording.samplingRate} Hz · ${s.recording.durationSec.toFixed(1)} s`
-              : "Upload a file or start demo mode"
-          }
-        />
-        <StatCard
-          icon={<Brain className="size-4" />}
-          label="Latest risk score"
-          value={last ? `${last.riskScore.toFixed(0)} / 100` : "—"}
-          hint={last ? last.classification : "No analysis yet"}
-          color={last ? riskColorVar(last.riskScore) : undefined}
-        />
-        <StatCard
-          icon={<Database className="size-4" />}
-          label="Reference model"
-          value={s.model ? s.model.datasetOrigin : "building…"}
-          hint={
-            s.model
-              ? `${s.model.featureKeys.length} features · acc ${s.model.metrics ? fmt(s.model.metrics.accuracy * 100, 1) : "—"}%`
-              : "Preparing reference distributions"
-          }
-        />
-        <StatCard
-          icon={<LineChart className="size-4" />}
-          label="Analyses stored"
-          value={String(s.history.length)}
-          hint={last ? `Last: ${fmtDate(last.createdAt)}` : "History is kept in this browser"}
-        />
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <Metric label="Pre-screen" value={String(stages.preScreen)} />
+        <Metric label="Human review" value={String(stages.humanReview)} />
+        <Metric label="Consent pending" value={String(stages.consent)} />
+        <Metric label="Enrolled" value={String(stages.enrolled)} />
+        <Metric label="Open tasks" value={String(openTasks.length)} />
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <Card>
           <CardHeader>
-            <CardTitle>Assessment workflow</CardTitle>
-            <CardDescription>
-              Each stage is deterministic and inspectable — no step fabricates data.
-            </CardDescription>
+            <CardTitle>Recruitment pipeline</CardTitle>
+            <CardDescription>Discovery to enrollment with mandatory human gate.</CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2">
-            {[
-              ["1 · File upload", "CSV, TXT or EDF/EDF+ parsed in-browser."],
-              ["2 · Signal validation", "Flat channels, invalid samples, duration and clipping checks."],
-              ["3 · Preprocessing", "Baseline removal, FIR band-pass, zero-phase notch, normalisation."],
-              ["4 · Parameter extraction", "Time, frequency band, nonlinear and wavelet features."],
-              ["5 · Reference comparison", "Per-parameter z-scores against class distributions."],
-              ["6 · Risk calculation", "Softmax model probabilities → 0–100 research risk score."],
-              ["7 · Visualisation", "Waveform, spectrum, spectrogram and risk timeline."],
-              ["8 · Reporting", "PDF report and locally stored analysis history."],
-            ].map(([t, d]) => (
-              <div key={t} className="rounded-lg border border-border bg-secondary/30 p-3">
-                <p className="text-sm font-medium">{t}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{d}</p>
-              </div>
-            ))}
+          <CardContent className="space-y-2 text-sm">
+            <p>Discovery: {stages.discovery}</p>
+            <p>Pre-screen: {stages.preScreen}</p>
+            <p>Human review: {stages.humanReview}</p>
+            <p>Consent: {stages.consent}</p>
+            <p>Enrolled: {stages.enrolled}</p>
           </CardContent>
         </Card>
 
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ShieldAlert className="size-4 text-destructive" /> Safety notice
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-xs text-muted-foreground">
-              <p>
-                This software is a Biomedical Engineering research prototype. It is not a medical
-                device and has not been clinically validated.
-              </p>
-              <p>
-                Outputs are algorithmic pattern-similarity scores. They must never be used for
-                diagnosis, monitoring, or treatment decisions.
-              </p>
-              <Link to="/methodology" className="inline-block text-primary underline">
-                Read the methodology and limitations
-              </Link>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Processing backend</CardTitle>
-              <CardDescription>
-                Modular architecture: an optional Python service (MNE, SciPy, scikit-learn) can take
-                over any stage.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {backend.modules.map((m) => (
-                <div key={m.name} className="flex items-center justify-between gap-2 text-xs">
-                  <span className="text-muted-foreground">{m.name}</span>
-                  <Badge variant={m.status === "not-connected" ? "outline" : "secondary"}>
-                    {m.status === "not-connected" ? "in-browser" : "remote"}
-                  </Badge>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Site performance</CardTitle>
+            <CardDescription>Cross-site enrollment and conversion metrics.</CardDescription>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Site</TableHead>
+                  <TableHead className="text-right">Enrolled</TableHead>
+                  <TableHead className="text-right">Target</TableHead>
+                  <TableHead className="text-right">Conversion</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {siteMetrics.map((site) => (
+                  <TableRow key={site.siteId}>
+                    <TableCell>{site.siteName}</TableCell>
+                    <TableCell className="text-right">{site.enrolled}</TableCell>
+                    <TableCell className="text-right">{site.targetEnrollment}</TableCell>
+                    <TableCell className="text-right">{site.conversionRate}%</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </div>
     </AppShell>
   );
 }
 
-function StatCard({
-  icon,
-  label,
-  value,
-  hint,
-  color,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  hint: string;
-  color?: string;
-}) {
+function Metric({ label, value }: { label: string; value: string }) {
   return (
     <Card>
       <CardContent className="pt-6">
-        <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
-          <span className="text-primary">{icon}</span>
-          {label}
-        </div>
-        <p className="mt-2 truncate text-lg font-semibold" style={color ? { color } : undefined}>
-          {value}
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+        <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+        <p className="mt-1 text-2xl font-semibold">{value}</p>
       </CardContent>
     </Card>
   );
