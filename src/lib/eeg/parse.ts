@@ -267,11 +267,15 @@ export function parseEdf(buffer: ArrayBuffer, fileName: string, fileSize: number
   const data: Float64Array[] = keep.map(({ i }) => new Float64Array(samplesPerRecord[i] * numRecords));
   const writeIdx = keep.map(() => 0);
 
+  // channel index -> index into `keep`, precomputed so the hot loop stays O(1)
+  const keepMap = new Map<number, number>();
+  keep.forEach(({ i }, ki) => keepMap.set(i, ki));
+
   let pos = headerBytes;
   for (let r = 0; r < numRecords; r++) {
     for (let s = 0; s < ns; s++) {
       const n = samplesPerRecord[s];
-      const keepIdx = keep.findIndex((k) => k.i === s);
+      const keepIdx = keepMap.get(s) ?? -1;
       for (let k = 0; k < n; k++) {
         const bytePos = pos + k * 2;
         if (bytePos + 1 >= buf.length) break;

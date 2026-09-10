@@ -209,10 +209,61 @@ export function detectArtifacts(x: Signal, k = 6): { ratio: number; segments: nu
       }
     } else inSeg = false;
   }
-  const p = peakAbs(x);
-  let atPeak = 0;
-  for (let i = 0; i < x.length; i++) if (Math.abs(Math.abs(x[i]) - p) < 1e-9) atPeak++;
-  return { ratio: x.length ? count / x.length : 0, segments, clipped: atPeak > x.length * 0.01 };
+  return { ratio: x.length ? count / x.length : 0, segments, clipped: detectClipping(x) };
+}
+
+/**
+ * Rail-based clipping detection.
+ *
+ * True amplifier clipping shows up as *repeated consecutive* samples pinned at a
+ * fixed rail near the signal minimum and maximum, not merely as samples close to
+ * a single extreme peak. We therefore look for flat runs (>= 3 samples) sitting
+ * inside a narrow tolerance band at either rail and require a meaningful sample
+ * fraction, so quantisation noise or one genuine large spike is not misread as
+ * clipping.
+ */
+export function detectClipping(x: Signal, minFraction = 0.005): boolean {
+  const n = x.length;
+  if (n < 64) return false;
+  let mn = Infinity;
+  let mx = -Infinity;
+  for (let i = 0; i < n; i++) {
+    const v = x[i];
+    if (!Number.isFinite(v)) continue;
+    if (v < mn) mn = v;
+    if (v > mx) mx = v;
+  }
+  const span = mx - mn;
+  if (!Number.isFinite(span) || span < 1e-12) return false; // flat signal, handled separately
+  const tol = span * 0.002;
+
+  // a rail is a run of >= 3 consecutive, essentially identical samples sitting in
+  // the tolerance band at the extreme — a rounded sine trough does not qualify
+  const flat = span * 1e-4;
+  const railRun = (isRail: (v: number) => boolean) => {
+    let railed = 0;
+    let run = 0;
+    let runValue = 0;
+    for (let i = 0; i <= n; i++) {
+      const v = i < n ? x[i] : NaN;
+      const on = i < n && Number.isFinite(v) && isRail(v) && (run === 0 || Math.abs(v - runValue) <= flat);
+      if (on) {
+        if (run === 0) runValue = v;
+        run++;
+      } else {
+        if (run >= 3) railed += run;
+        run = i < n && Number.isFinite(v) && isRail(v) ? 1 : 0;
+        runValue = v;
+      }
+    }
+    return railed / n;
+  };
+
+  const hi = railRun((v) => v >= mx - tol);
+  const lo = railRun((v) => v <= mn + tol);
+  const need = Math.max(minFraction, 5 / n);
+  // both rails pinned, or one rail pinned for a substantial share of the record
+  return (hi >= need && lo >= need) || hi >= need * 4 || lo >= need * 4;
 }
 
 /* ---------------------------------- FFT ----------------------------------- */

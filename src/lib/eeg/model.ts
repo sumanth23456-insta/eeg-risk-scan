@@ -154,9 +154,10 @@ function standardize(samples: Sample[], keys: string[]) {
 
 export function encode(f: FeatureVector, keys: string[], mu: number[], sigma: number[]): number[] {
   return keys.map((k, i) => {
-    const v = (f[k] ?? 0 - mu[i]) as number;
-    const z = ((f[k] ?? 0) - mu[i]) / (sigma[i] || 1);
-    return Number.isFinite(z) ? Math.max(-8, Math.min(8, z)) : 0 * v;
+    const raw = f[k];
+    const value = Number.isFinite(raw) ? (raw as number) : 0;
+    const z = (value - mu[i]) / (sigma[i] || 1);
+    return Number.isFinite(z) ? Math.max(-8, Math.min(8, z)) : 0;
   });
 }
 

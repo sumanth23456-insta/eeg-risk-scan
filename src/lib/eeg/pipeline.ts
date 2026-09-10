@@ -343,11 +343,17 @@ export interface AnalysisResult {
   powerlineBefore: number;
   powerlineAfter: number;
   technical: TechnicalInfo;
-  recordingId_: string;
 }
+
+/** Default RMS outlier factor used by the optional channel-consistency filter. */
+export const DEFAULT_CHANNEL_RMS_FACTOR = 6;
 
 export interface RunAnalysisArgs {
   recording: EegRecording;
+  /** Set false to keep amplitude-heterogeneous channels (real multi-region montages). */
+  channelConsistency?: boolean;
+  /** RMS outlier factor for the consistency filter (default 6). */
+  channelConsistencyFactor?: number;
   /** EEG channel indices to analyse. Defaults to all channels. */
   channelIndices?: number[];
   /** Legacy single-channel entry point. */
@@ -490,13 +496,17 @@ export function runAnalysis(args: RunAnalysisArgs): AnalysisResult {
     }
   }
 
-  // channel-consistency check: a channel whose RMS is wildly off the group is suspect
+  // channel-consistency check: a channel whose RMS is wildly off the group is suspect.
+  // Optional, because heterogeneous montages (temporal vs. frontal) legitimately
+  // differ in baseline amplitude — see RunAnalysisArgs.channelConsistency.
+  const consistencyFactor =
+    args.channelConsistency === false ? 0 : (args.channelConsistencyFactor ?? DEFAULT_CHANNEL_RMS_FACTOR);
   const includedRms = reports.filter((r) => r.included).map((r) => r.rms);
-  if (includedRms.length >= 4) {
+  if (consistencyFactor > 1 && includedRms.length >= 4) {
     const medRms = median(includedRms);
     for (const r of reports) {
       if (!r.included) continue;
-      if (medRms > 1e-9 && (r.rms > 6 * medRms || r.rms < medRms / 6)) {
+      if (medRms > 1e-9 && (r.rms > consistencyFactor * medRms || r.rms < medRms / consistencyFactor)) {
         r.included = false;
         r.quality = r.quality === "Good" ? "Poor" : r.quality;
         r.exclusionReason = `amplitude inconsistent with the other channels (RMS ${r.rms.toFixed(1)} vs median ${medRms.toFixed(1)} µV)`;
@@ -671,7 +681,6 @@ export function runAnalysis(args: RunAnalysisArgs): AnalysisResult {
     id: `an_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
     createdAt: new Date().toISOString(),
     recordingId: recording.id,
-    recordingId_: recording.id,
     fileName: recording.fileName,
     source: recording.source,
     recordingLabel: recording.demoLabel,
