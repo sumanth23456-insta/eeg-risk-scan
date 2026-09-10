@@ -343,7 +343,6 @@ export interface AnalysisResult {
   powerlineBefore: number;
   powerlineAfter: number;
   technical: TechnicalInfo;
-  recordingId_: string;
 }
 
 export interface RunAnalysisArgs {
