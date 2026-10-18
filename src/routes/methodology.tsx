@@ -21,6 +21,8 @@ export const Route = createFileRoute("/methodology")({
         property: "og:description",
         content: "How the EEG risk score is computed, validated, and why it is not a clinical tool.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: MethodologyPage,

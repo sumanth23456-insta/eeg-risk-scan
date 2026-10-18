@@ -61,6 +61,8 @@ export const Route = createFileRoute("/analysis")({
         property: "og:description",
         content: "Explore EEG parameters, pattern comparison and a 0–100 research seizure risk score.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: AnalysisPage,

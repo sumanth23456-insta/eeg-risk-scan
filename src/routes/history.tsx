@@ -27,6 +27,8 @@ export const Route = createFileRoute("/history")({
         property: "og:description",
         content: "Locally stored log of previous EEG seizure risk analyses.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   loader: () => requireUnlocked(),
