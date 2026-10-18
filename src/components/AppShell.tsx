@@ -2,6 +2,7 @@ import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { Activity, AlertTriangle, Lock, LogOut } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { getGateStatus, signOut } from "@/lib/gate.functions";
+import brainMark from "@/assets/neuro-brain.png.asset.json";
 
 const NAV = [
   { to: "/", label: "Dashboard" },
@@ -66,9 +67,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-40 border-b border-border bg-card/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <Link to="/" className="flex items-center gap-2">
-            <span className="flex size-8 items-center justify-center rounded-md bg-primary/15 text-primary">
-              <Activity className="size-4" />
-            </span>
+            <img src={brainMark.url} alt="NeuroRisk EEG brain mark" className="size-9 object-contain" />
             <span className="leading-tight">
               <span className="block text-sm font-semibold tracking-tight">NeuroRisk EEG</span>
               <span className="block text-[10px] uppercase tracking-widest text-muted-foreground">
