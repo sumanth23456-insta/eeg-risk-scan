@@ -35,6 +35,8 @@ export const Route = createFileRoute("/training")({
         property: "og:description",
         content: "Researcher tools: retrain the reference model and inspect validation metrics.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   loader: () => requireUnlocked(),

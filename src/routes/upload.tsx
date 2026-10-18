@@ -34,6 +34,8 @@ export const Route = createFileRoute("/upload")({
         property: "og:description",
         content: "Import CSV, TXT or EDF EEG files and validate signal quality before analysis.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: UploadPage,

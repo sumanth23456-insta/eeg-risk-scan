@@ -24,6 +24,8 @@ export const Route = createFileRoute("/")({
         content:
           "Upload EEG recordings, extract time, frequency, nonlinear and wavelet parameters, and compute a research risk score.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: Dashboard,
